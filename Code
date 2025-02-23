@@ -1,0 +1,111 @@
+import requests
+from bs4 import BeautifulSoup
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import tkinter as tk
+from tkinter import ttk
+from tkinter import scrolledtext
+
+# Create a SentimentIntensityAnalyzer object
+analyzer = SentimentIntensityAnalyzer()
+
+def analyze_sentiments(text):
+    sentiment_scores = analyzer.polarity_scores(text)
+    compound_score = sentiment_scores['compound']
+
+    if compound_score >= 0.05:
+        return "Positive", compound_score
+    elif compound_score <= -0.05:
+        return "Negative", compound_score
+    else:
+        return "Neutral", compound_score
+
+def display_comments(comments_text):
+    comment_text.config(state='normal')
+    comment_text.delete(1.0, 'end')
+
+    good_comments = 0
+    bad_comments = 0
+    total_comments = 0
+    comment_number=1
+
+    for comment in comments_text.split('\n'):
+        if comment.strip():
+            sentiment, compound_score = analyze_sentiments(comment)
+            comment_text.insert('end', f"Comment {comment_number}:\n{comment}\nSentiment: {sentiment}\nCompound Score: {compound_score:.2f}\n\n")
+            if sentiment == "Positive":
+                good_comments += 1
+            elif sentiment == "Negative":
+                bad_comments += 1
+            total_comments += 1
+            comment_number += 1
+ 
+    comment_text.config(state='disabled')
+    neutral_comments = total_comments - (good_comments + bad_comments)
+
+    stats_text.set(f"Total Comments: {total_comments}\nGood Comments: {good_comments} ({(good_comments / total_comments) * 100:.2f}%)\nBad Comments: {bad_comments} ({(bad_comments / total_comments) * 100:.2f}%)\nNeutral Comments: {neutral_comments} ({(neutral_comments / total_comments) * 100:.2f}%)")
+
+def analyze():
+    input_text = input_entry.get("1.0", "end-1c")
+
+    if analyze_choice.get() == "URL":
+        url = url_entry.get()
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                comments = [comment.get_text() for comment in soup.find_all('p')]
+                comments_text = '\n'.join(comments)
+                display_comments(comments_text)
+            else:
+                result_text.set("Failed to retrieve data from the URL. Please check the URL.")
+                stats_text.set("")
+                return
+        except Exception as e:
+            result_text.set(f"An error occurred: {str(e)}")
+            stats_text.set("")
+            return
+    else:
+        display_comments(input_text)
+
+app = tk.Tk()
+app.title("Sentiment Analysis App")
+
+frame = ttk.Frame(app)
+frame.grid(column=0, row=0, padx=10, pady=10)
+
+url_label = ttk.Label(frame, text="Enter the URL of the webpage:")
+url_label.grid(column=0, row=0, padx=5, pady=5)
+
+url_entry = ttk.Entry(frame, width=40)
+url_entry.grid(column=0, row=1, padx=5, pady=5)
+
+input_label = ttk.Label(frame, text="Enter text for sentiment analysis:")
+input_label.grid(column=0, row=2, padx=5, pady=5)
+
+input_entry = tk.Text(frame, width=40, height=10)
+input_entry.grid(column=0, row=3, padx=5, pady=5)
+
+analyze_choice = tk.StringVar()
+analyze_choice.set("URL")
+
+url_radio = ttk.Radiobutton(frame, text="Analyze URL", variable=analyze_choice, value="URL")
+url_radio.grid(column=0, row=4, padx=5, pady=5)
+
+text_radio = ttk.Radiobutton(frame, text="Analyze User Input", variable=analyze_choice, value="Text")
+text_radio.grid(column=0, row=5, padx=5, pady=5)
+
+analyze_button = ttk.Button(frame, text="Analyze", command=analyze)
+analyze_button.grid(column=0, row=6, padx=5, pady=5)
+
+result_text = tk.StringVar()
+result_label = ttk.Label(frame, textvariable=result_text)
+result_label.grid(column=0, row=7, padx=5, pady=5)
+
+comment_text = scrolledtext.ScrolledText(frame, width=50, height=10)
+comment_text.grid(column=0, row=8, padx=5, pady=5)
+
+stats_text = tk.StringVar()
+stats_label = ttk.Label(frame, textvariable=stats_text)
+stats_label.grid(column=0, row=9, padx=5, pady=5)
+
+app.mainloop()
